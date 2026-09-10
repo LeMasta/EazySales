@@ -1,0 +1,62 @@
+name: Build and publish Windows release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  create-tag:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release-version.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Read version and create release tag
+        id: release-version
+        shell: bash
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+          CURRENT_COMMIT="$(git rev-parse HEAD)"
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            EXISTING_COMMIT="$(git rev-list -n 1 "v$VERSION")"
+            if ! git merge-base --is-ancestor "$EXISTING_COMMIT" "$CURRENT_COMMIT"; then
+              echo "::error::Tag v$VERSION is not in the current main history"
+              exit 1
+            fi
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "EazySales v$VERSION"
+          git push origin "v$VERSION"
+
+  release:
+    needs: create-tag
+    if: always() && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && needs.create-tag.result == 'success'))
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', needs.create-tag.outputs.version) || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Build installer and publish GitHub Release
+        run: npx electron-builder --win nsis --x64 --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
