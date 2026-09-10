@@ -62,7 +62,23 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - name: Build installer and publish GitHub Release
-        run: npx electron-builder --win nsis --x64 --publish always
+      - name: Build Windows installer
+        run: npx electron-builder --win nsis --x64 --publish never
+      - name: Publish one complete GitHub Release
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          $tag = "v$version"
+          $releases = gh api "repos/${{ github.repository }}/releases?per_page=100" | ConvertFrom-Json
+          $releases |
+            Where-Object { $_.tag_name -eq $tag -and $_.draft } |
+            ForEach-Object { gh api --method DELETE "repos/${{ github.repository }}/releases/$($_.id)" }
+          gh release create $tag `
+            "release/EazySales-Setup-$version.exe" `
+            "release/EazySales-Setup-$version.exe.blockmap" `
+            "release/latest.yml" `
+            --title "EazySales $tag" `
+            --generate-notes `
+            --verify-tag
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
