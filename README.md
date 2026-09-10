@@ -32,7 +32,7 @@ npm run dist:win
 
 ## 发布
 
-在 GitHub Actions 中手动运行 **Build and publish Windows release**。工作流会读取 `package.json` 的版本号、创建对应标签并发布 Windows 安装包。新版本发布后，已安装的 EazySales 可在应用内检查并安装更新。
+在 GitHub Actions 中手动运行 **Build and publish Windows release**，或向 `main` 提交包含 `[release]` 的发布提交。工作流会读取 `package.json` 的版本号、创建对应标签并发布 Windows 安装包。新版本发布后，已安装的 EazySales 可在应用内检查并安装更新。
 
 ## License
 
